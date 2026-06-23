@@ -1,0 +1,128 @@
+name: TPCH_REVENUE_ANALYSIS
+description: >
+  Revenue analysis semantic view built on TPC-H sample data.
+  Provides metrics for order values, line item counts, and customer counts
+  with dimensions for time, customer, and order attributes.
+tables:
+  - name: CUSTOMERS
+    description: Main table for customer data
+    base_table:
+      database: SNOWFLAKE_SAMPLE_DATA
+      schema: TPCH_SF1
+      table: CUSTOMER
+    primary_key:
+      columns:
+        - C_CUSTKEY
+    dimensions:
+      - name: CUSTOMER_NAME
+        synonyms:
+          - customer name
+          - buyer name
+        description: Name of the customer
+        expr: C_NAME
+        data_type: VARCHAR(25)
+      - name: CUSTOMER_MARKET_SEGMENT
+        synonyms:
+          - market segment
+          - segment
+        description: Market segment the customer belongs to
+        expr: C_MKTSEGMENT
+        data_type: VARCHAR(10)
+      - name: C_CUSTKEY
+        expr: C_CUSTKEY
+        data_type: VARCHAR(134217728)
+    metrics:
+      - name: CUSTOMER_COUNT
+        description: Total number of distinct customers
+        expr: COUNT(DISTINCT C_CUSTKEY)
+
+  - name: ORDERS
+    synonyms:
+      - sales orders
+    description: All orders placed by customers
+    base_table:
+      database: SNOWFLAKE_SAMPLE_DATA
+      schema: TPCH_SF1
+      table: ORDERS
+    primary_key:
+      columns:
+        - O_ORDERKEY
+    dimensions:
+      - name: ORDER_DATE
+        description: Date when the order was placed
+        expr: O_ORDERDATE
+        data_type: DATE
+      - name: ORDER_YEAR
+        synonyms:
+          - year
+        description: Year when the order was placed
+        expr: YEAR(O_ORDERDATE)
+        data_type: "NUMBER(4,0)"
+      - name: ORDER_STATUS
+        description: Current status of the order (F=fulfilled, O=open, P=pending)
+        expr: O_ORDERSTATUS
+        data_type: VARCHAR(1)
+      - name: O_ORDERKEY
+        expr: O_ORDERKEY
+        data_type: VARCHAR(134217728)
+      - name: O_CUSTKEY
+        expr: O_CUSTKEY
+        data_type: VARCHAR(134217728)
+    facts:
+      - name: COUNT_LINE_ITEMS
+        description: Number of line items in the order
+        expr: COUNT(LINE_ITEMS.LINE_ITEM_ID)
+        data_type: "NUMBER(18,0)"
+    metrics:
+      - name: ORDER_AVERAGE_VALUE
+        description: Average order value across all orders
+        expr: AVG(ORDERS.O_TOTALPRICE)
+      - name: AVERAGE_LINE_ITEMS_PER_ORDER
+        description: Average number of line items per order
+        expr: AVG(ORDERS.COUNT_LINE_ITEMS)
+      - name: TOTAL_REVENUE
+        description: Sum of all order values
+        expr: SUM(O_TOTALPRICE)
+
+  - name: LINE_ITEMS
+    description: Individual line items within orders
+    base_table:
+      database: SNOWFLAKE_SAMPLE_DATA
+      schema: TPCH_SF1
+      table: LINEITEM
+    primary_key:
+      columns:
+        - L_ORDERKEY
+        - L_LINENUMBER
+    dimensions:
+      - name: L_ORDERKEY
+        expr: L_ORDERKEY
+        data_type: VARCHAR(134217728)
+      - name: L_LINENUMBER
+        expr: L_LINENUMBER
+        data_type: VARCHAR(134217728)
+    facts:
+      - name: LINE_ITEM_ID
+        description: Unique identifier for a line item
+        expr: "CONCAT(L_ORDERKEY, '-', L_LINENUMBER)"
+        data_type: VARCHAR(134217728)
+      - name: DISCOUNTED_PRICE
+        description: Extended price after applying the discount
+        expr: L_EXTENDEDPRICE * (1 - L_DISCOUNT)
+        data_type: "NUMBER(25,4)"
+
+relationships:
+  - name: ORDERS_TO_CUSTOMERS
+    left_table: ORDERS
+    right_table: CUSTOMERS
+    relationship_columns:
+      - left_column: O_CUSTKEY
+        right_column: C_CUSTKEY
+    relationship_type: many_to_one
+  - name: LINE_ITEMS_TO_ORDERS
+    left_table: LINE_ITEMS
+    right_table: ORDERS
+    relationship_columns:
+      - left_column: L_ORDERKEY
+        right_column: O_ORDERKEY
+    relationship_type: many_to_one

@@ -1,0 +1,7 @@
+default_connection_name = "default"
+
+[connections.default]
+account = ""
+database = "SANDBOX"
+schema = "PUBLIC"
+warehouse = "COMPUTE_G2_S"
