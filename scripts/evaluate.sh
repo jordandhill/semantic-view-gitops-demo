@@ -31,7 +31,7 @@ snow sql -q "CREATE STAGE IF NOT EXISTS ${TARGET_SCHEMA}.EVAL_CONFIGS
 # 2. Generate eval config YAML
 EVAL_CONFIG="evaluation:
   analyst_params:
-    analyst_name: \"${SV_NAME}\"
+    analyst_name: \"${DB}.${SCHEMA}.${SV_NAME}\"
     analyst_type: \"SEMANTIC VIEW\"
   source_metadata:
     type: \"verified_queries\"
