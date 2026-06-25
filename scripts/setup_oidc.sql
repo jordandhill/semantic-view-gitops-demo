@@ -29,18 +29,25 @@ GRANT IMPORTED PRIVILEGES ON DATABASE SNOWFLAKE_SAMPLE_DATA TO ROLE CICD_SEMANTI
 -- 4. Grant warehouse usage for query execution
 GRANT USAGE ON WAREHOUSE COMPUTE_G2_S TO ROLE CICD_SEMANTIC_VIEWS;
 
--- 5. Set defaults for the service user
+-- 5. Grant privileges for Cortex Analyst evaluations
+GRANT DATABASE ROLE SNOWFLAKE.CORTEX_USER TO ROLE CICD_SEMANTIC_VIEWS;
+GRANT EXECUTE TASK ON ACCOUNT TO ROLE CICD_SEMANTIC_VIEWS;
+GRANT CREATE TASK ON SCHEMA SANDBOX.PUBLIC TO ROLE CICD_SEMANTIC_VIEWS;
+GRANT CREATE DATASET ON SCHEMA SANDBOX.PUBLIC TO ROLE CICD_SEMANTIC_VIEWS;
+GRANT CREATE STAGE ON SCHEMA SANDBOX.PUBLIC TO ROLE CICD_SEMANTIC_VIEWS;
+
+-- 6. Set defaults for the service user
 ALTER USER GITHUB_ACTIONS_SVC SET DEFAULT_ROLE = CICD_SEMANTIC_VIEWS;
 ALTER USER GITHUB_ACTIONS_SVC SET DEFAULT_WAREHOUSE = COMPUTE_G2_S;
 
--- 6. (Optional) If account has a restrictive network policy, create a
+-- 7. (Optional) If account has a restrictive network policy, create a
 --    user-level policy allowing GitHub Actions runner IPs
 CREATE OR REPLACE NETWORK POLICY GITHUB_ACTIONS_POLICY
   ALLOWED_IP_LIST = ('0.0.0.0/0')
   COMMENT = 'Allows GitHub Actions runners to connect (restrict in production)';
 ALTER USER GITHUB_ACTIONS_SVC SET NETWORK_POLICY = GITHUB_ACTIONS_POLICY;
 
--- 7. (Optional) If account has a restrictive authentication policy,
+-- 8. (Optional) If account has a restrictive authentication policy,
 --    create a user-level policy allowing workload identity
 CREATE OR REPLACE AUTHENTICATION POLICY SANDBOX.PUBLIC.GITHUB_ACTIONS_AUTH_POLICY
   AUTHENTICATION_METHODS = (WORKLOAD_IDENTITY)

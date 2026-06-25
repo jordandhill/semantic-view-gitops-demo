@@ -36,3 +36,28 @@ jobs:
           SNOWFLAKE_SCHEMA: PUBLIC
           SNOWFLAKE_TARGET_SCHEMA: "SANDBOX.PUBLIC"
         run: ./scripts/deploy.sh
+
+  evaluate:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Snowflake CLI + OIDC Auth
+        uses: snowflakedb/snowflake-actions@v3
+        with:
+          use-oidc: true
+          cli-version: "3.16"
+          default-config-file-path: config.toml
+
+      - name: Run Cortex Analyst Evaluation
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_WAREHOUSE: COMPUTE_G2_S
+          SNOWFLAKE_DATABASE: SANDBOX
+          SNOWFLAKE_SCHEMA: PUBLIC
+          SNOWFLAKE_TARGET_SCHEMA: "SANDBOX.PUBLIC"
+          EVAL_THRESHOLD: "80"
+        run: ./scripts/evaluate.sh

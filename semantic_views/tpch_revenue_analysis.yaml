@@ -133,3 +133,105 @@ relationships:
       - left_column: L_ORDERKEY
         right_column: O_ORDERKEY
     relationship_type: many_to_one
+
+verified_queries:
+  - name: "total_revenue_by_year"
+    question: "What is the total revenue by year?"
+    verified_at: 1750000000
+    verified_by: "jordan.hill@snowflake.com"
+    use_as_onboarding_question: true
+    sql: |
+      SELECT order_year, SUM(o_totalprice) AS total_revenue
+      FROM __orders
+      GROUP BY order_year
+      ORDER BY order_year
+
+  - name: "customers_by_segment"
+    question: "How many customers are in each market segment?"
+    verified_at: 1750000000
+    verified_by: "jordan.hill@snowflake.com"
+    use_as_onboarding_question: true
+    sql: |
+      SELECT customer_market_segment, COUNT(DISTINCT c_custkey) AS customer_count
+      FROM __customers
+      GROUP BY customer_market_segment
+      ORDER BY customer_count DESC
+
+  - name: "avg_order_value_1995"
+    question: "What is the average order value for 1995?"
+    verified_at: 1750000000
+    verified_by: "jordan.hill@snowflake.com"
+    sql: |
+      SELECT AVG(o_totalprice) AS avg_order_value
+      FROM __orders
+      WHERE order_year = 1995
+
+  - name: "avg_line_items_per_order"
+    question: "What is the average number of line items per order?"
+    verified_at: 1750000000
+    verified_by: "jordan.hill@snowflake.com"
+    use_as_onboarding_question: true
+    sql: |
+      SELECT AVG(count_line_items) AS avg_line_items
+      FROM __orders
+
+  - name: "discounted_revenue_by_year"
+    question: "What is the total discounted revenue by year?"
+    verified_at: 1750000000
+    verified_by: "jordan.hill@snowflake.com"
+    sql: |
+      SELECT order_year, SUM(discounted_price) AS total_discounted_revenue
+      FROM __line_items
+      JOIN __orders ON __line_items.l_orderkey = __orders.o_orderkey
+      GROUP BY order_year
+      ORDER BY order_year
+
+  - name: "revenue_fulfilled_orders"
+    question: "What is the total revenue for fulfilled orders?"
+    verified_at: 1750000000
+    verified_by: "jordan.hill@snowflake.com"
+    sql: |
+      SELECT SUM(o_totalprice) AS total_revenue
+      FROM __orders
+      WHERE order_status = 'F'
+
+  - name: "top_5_customers_by_orders"
+    question: "Who are the top 5 customers by number of orders?"
+    verified_at: 1750000000
+    verified_by: "jordan.hill@snowflake.com"
+    sql: |
+      SELECT customer_name, COUNT(DISTINCT o_orderkey) AS order_count
+      FROM __orders
+      JOIN __customers ON __orders.o_custkey = __customers.c_custkey
+      GROUP BY customer_name
+      ORDER BY order_count DESC
+      LIMIT 5
+
+  - name: "avg_discount_savings"
+    question: "What is the average discount savings per line item?"
+    verified_at: 1750000000
+    verified_by: "jordan.hill@snowflake.com"
+    sql: |
+      SELECT AVG(l_extendedprice * l_discount) AS avg_discount_savings
+      FROM __line_items
+
+  - name: "orders_by_status"
+    question: "How many orders are there by status?"
+    verified_at: 1750000000
+    verified_by: "jordan.hill@snowflake.com"
+    sql: |
+      SELECT order_status, COUNT(DISTINCT o_orderkey) AS order_count
+      FROM __orders
+      GROUP BY order_status
+      ORDER BY order_count DESC
+
+  - name: "revenue_by_segment"
+    question: "What is the total revenue by customer market segment?"
+    verified_at: 1750000000
+    verified_by: "jordan.hill@snowflake.com"
+    sql: |
+      SELECT customer_market_segment, SUM(o_totalprice) AS total_revenue
+      FROM __orders
+      JOIN __customers ON __orders.o_custkey = __customers.c_custkey
+      GROUP BY customer_market_segment
+      ORDER BY total_revenue DESC
