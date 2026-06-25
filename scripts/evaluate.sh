@@ -41,12 +41,13 @@ metrics:
 "
 
 # Write config to temp file and upload to stage
-TMPFILE=$(mktemp /tmp/eval_config_XXXXXX.yaml)
+TMPDIR=$(mktemp -d)
+TMPFILE="${TMPDIR}/${CONFIG_FILE}"
 echo "$EVAL_CONFIG" > "$TMPFILE"
 
 echo "--- Uploading eval config to stage ---"
 snow stage copy "$TMPFILE" "${STAGE_PATH}/" --overwrite -x
-rm -f "$TMPFILE"
+rm -rf "$TMPDIR"
 
 # 3. Start the evaluation run
 echo ""
