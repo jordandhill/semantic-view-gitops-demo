@@ -110,6 +110,13 @@ tables:
         description: Extended price after applying the discount
         expr: L_EXTENDEDPRICE * (1 - L_DISCOUNT)
         data_type: "NUMBER(25,4)"
+    metrics:
+      - name: TOTAL_DISCOUNTED_REVENUE
+        description: Total revenue after all line-item discounts applied
+        expr: SUM(LINE_ITEMS.DISCOUNTED_PRICE)
+      - name: AVERAGE_DISCOUNT_SAVINGS
+        description: Average discount savings per line item
+        expr: AVG(L_EXTENDEDPRICE * L_DISCOUNT)
 
 relationships:
   - name: ORDERS_TO_CUSTOMERS
