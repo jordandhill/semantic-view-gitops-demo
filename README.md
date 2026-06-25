@@ -14,9 +14,9 @@ Version-control Snowflake **Semantic Views** with Git and deploy them automatica
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-- **PR validation**: `SYSTEM$CREATE_SEMANTIC_VIEW_FROM_YAML(..., TRUE)` confirms the YAML is structurally valid without deploying
+- **PR validation**: [`SYSTEM$CREATE_SEMANTIC_VIEW_FROM_YAML`](https://docs.snowflake.com/en/user-guide/views-semantic/sql#creating-a-semantic-view-from-a-yaml-specification)`(..., TRUE)` confirms the YAML is structurally valid without deploying
 - **Deploy on merge**: Same function without the dry-run flag creates/replaces the semantic view in `SANDBOX.PUBLIC`
-- **Auth**: OIDC workload identity federation — no stored secrets, short-lived tokens per run
+- **Auth**: [OIDC workload identity federation](https://docs.snowflake.com/en/user-guide/workload-identity-federation) — no stored secrets, short-lived tokens per run
 
 ## Repository Structure
 
@@ -54,6 +54,8 @@ CREATE OR REPLACE USER GITHUB_ACTIONS_SVC
     SUBJECT = 'repo:<owner>/semantic-view-gitops-demo:ref:refs/heads/main'
   );
 ```
+
+> See [Workload Identity Federation — OIDC subject formats](https://docs.snowflake.com/en/developer-guide/snowflake-cli/cicd/github-action#create-the-service-user) for subject claim variants (PR events, environments, etc.)
 
 ### 2. Set GitHub Secret
 
@@ -106,3 +108,25 @@ This demo uses TPC-H sample data to create a revenue analysis semantic view with
 - **Safe deployments** — PR validation catches errors before they hit production
 - **Rollback** — `git revert` undoes any bad deploy
 - **Collaboration** — standard PR review workflow for data model changes
+
+## Snowflake Features Used
+
+| Feature | What It Does | Docs |
+|---------|-------------|------|
+| **Semantic Views** | Business-friendly semantic layer for Cortex Analyst; defines tables, relationships, dimensions, facts, and metrics in SQL or YAML | [Overview](https://docs.snowflake.com/en/user-guide/views-semantic/overview) · [SQL commands](https://docs.snowflake.com/en/user-guide/views-semantic/sql) · [CREATE SEMANTIC VIEW](https://docs.snowflake.com/en/sql-reference/sql/create-semantic-view) |
+| **SYSTEM$CREATE_SEMANTIC_VIEW_FROM_YAML** | Creates (or validates) a semantic view from a YAML spec; `TRUE` as 3rd arg is a dry-run | [Docs](https://docs.snowflake.com/en/user-guide/views-semantic/sql#creating-a-semantic-view-from-a-yaml-specification) |
+| **SYSTEM$READ_YAML_FROM_SEMANTIC_VIEW** | Exports an existing semantic view back to YAML — useful for seeding the YAML file from a view you built in the UI | [Docs](https://docs.snowflake.com/en/user-guide/views-semantic/sql#getting-the-yaml-specification-for-a-semantic-view) |
+| **Workload Identity Federation (OIDC)** | Allows GitHub Actions to authenticate to Snowflake with short-lived OIDC tokens — no static secrets needed | [WIF overview](https://docs.snowflake.com/en/user-guide/workload-identity-federation) · [GitHub OIDC guide](https://docs.snowflake.com/en/developer-guide/snowflake-cli/cicd/github-action#workload-identity-federation-wif-with-oidc) |
+| **snowflakedb/snowflake-actions@v3** | GA GitHub Action that installs Snowflake CLI and configures OIDC auth in one step | [Marketplace](https://github.com/marketplace/actions/snowflake-actions) · [Repo](https://github.com/snowflakedb/snowflake-actions) · [Docs](https://docs.snowflake.com/en/developer-guide/snowflake-cli/cicd/github-action) |
+| **Snowflake CLI (`snow`)** | CLI for deploying Snowflake objects; `snow sql -q` runs ad-hoc SQL from CI/CD | [Install](https://docs.snowflake.com/en/developer-guide/snowflake-cli/installation/installation) · [snow sql](https://docs.snowflake.com/en/developer-guide/snowflake-cli/command-reference/sql-commands) · [CI/CD integration](https://docs.snowflake.com/en/developer-guide/snowflake-cli/cicd/integrate-ci-cd) |
+| **Authentication Policies** | Per-user or account-level policy controlling which auth methods are permitted; service users can be restricted to `WORKLOAD_IDENTITY` only | [Docs](https://docs.snowflake.com/en/user-guide/authentication-policy) |
+| **Network Policies** | IP allowlist/blocklist on a user or account; attach a user-level policy to a CI service user to avoid blanket account restrictions | [Docs](https://docs.snowflake.com/en/user-guide/network-policy) |
+| **Cortex Analyst** | NL-to-SQL AI assistant that uses semantic views as its data model; this demo's semantic view is immediately queryable via Cortex Analyst | [Overview](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-analyst) · [Quickstart](https://quickstarts.snowflake.com/guide/getting_started_with_cortex_analyst) |
+
+## Further Reading
+
+- [Configure CI/CD Integrations with Snowflake](https://www.snowflake.com/en/developers/guides/configure-cicd-integrations-with-snowflake) — step-by-step quickstart covering GitHub, GitLab, and Azure DevOps
+- [DevOps with Snowflake](https://docs.snowflake.com/en/developer-guide/builders/devops-with-snowflake) — broader DevOps concepts: DCM, versioning, pipelines
+- [CREATE OR ALTER SEMANTIC VIEW](https://docs.snowflake.com/en/sql-reference/sql/create-semantic-view) — idempotent DDL alternative to the YAML stored procedure approach
+- [Semantic View YAML spec reference](https://docs.snowflake.com/en/user-guide/views-semantic/sql#creating-a-semantic-view-from-a-yaml-specification) — full YAML schema with all supported fields
+- [Cortex Analyst — verified queries](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-analyst/verified-queries) — add golden Q&A pairs to your semantic view to improve AI accuracy
