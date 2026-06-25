@@ -29,5 +29,8 @@ jobs:
       - name: Validate Semantic View YAML (dry run)
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_WAREHOUSE: COMPUTE_G2_S
+          SNOWFLAKE_DATABASE: SANDBOX
+          SNOWFLAKE_SCHEMA: PUBLIC
           SNOWFLAKE_TARGET_SCHEMA: "SANDBOX.PUBLIC"
         run: ./scripts/deploy.sh --dry-run
