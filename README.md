@@ -5,19 +5,29 @@ Version-control Snowflake **Semantic Views** with Git and deploy them automatica
 ## How It Works
 
 ```
-┌──────────────────────────────────────────────────────────────────────────┐
-│  Developer edits semantic_views/tpch_revenue_analysis.yaml               │
-│  └─> Opens Pull Request                                                 │
-│       └─> GitHub Actions validates YAML (dry-run)                       │
-│            └─> PR merges to main                                        │
-│                 └─> GitHub Actions deploys to Snowflake                  │
-│                      └─> Cortex Analyst evaluation runs                  │
-│                           └─> Accuracy ≥ 80%? ✓ Pass : ✗ Fail pipeline  │
-└──────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  Developer edits semantic_views/tpch_revenue_analysis.yaml                    │
+│  └─> Opens Pull Request                                                      │
+│       └─> GitHub Actions validates YAML (dry-run)                            │
+│            └─> PR merges to main                                             │
+│                 └─> Deploys to SANDBOX_DEV (development)                      │
+│                      └─> Evaluation runs (threshold: 70%)                     │
+│                           └─> Ready to promote?                               │
+│                                └─> Create GitHub Release                      │
+│                                     └─> Deploys to SANDBOX (production)       │
+│                                          └─> Evaluation runs (threshold: 80%) │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
+| Trigger | Target | Eval Threshold | Purpose |
+|---------|--------|----------------|---------|
+| Push to `main` | `SANDBOX_DEV.PUBLIC` | 70% | Iterate quickly in development |
+| GitHub Release (tag) | `SANDBOX.PUBLIC` | 80% | Promote to production |
+| Manual dispatch | Choice of `dev` or `prod` | Varies | Ad-hoc deploys |
+
 - **PR validation**: [`SYSTEM$CREATE_SEMANTIC_VIEW_FROM_YAML(..., TRUE)`](https://docs.snowflake.com/en/user-guide/views-semantic/sql#creating-a-semantic-view-from-a-yaml-specification) confirms the YAML is structurally valid without deploying
-- **Deploy on merge**: Same function without the dry-run flag creates/replaces the semantic view in `SANDBOX.PUBLIC`
+- **Dev deploy (push to main)**: Deploys to `SANDBOX_DEV.PUBLIC` — fast iteration loop
+- **Prod promotion (GitHub Release)**: Deploys to `SANDBOX.PUBLIC` — higher eval threshold, production-grade
 - **Evaluation gate**: After deploy, [`EXECUTE_AI_EVALUATION`](https://docs.snowflake.com/en/sql-reference/functions/execute_ai_evaluation) runs verified queries through Cortex Analyst and checks `sql_correctness` accuracy
 - **Auth**: [OIDC workload identity federation](https://docs.snowflake.com/en/user-guide/workload-identity-federation) — no stored secrets, short-lived tokens per run
 
@@ -71,15 +81,25 @@ gh secret set SNOWFLAKE_ACCOUNT -b "YOUR_ACCOUNT_IDENTIFIER"
 
 ### 3. Push and Deploy
 
-Any push to `main` that modifies `semantic_views/` triggers deployment + evaluation automatically.
+Any push to `main` that modifies `semantic_views/` triggers deployment to **DEV** automatically.
 
-## Making Changes
+## Making Changes (Dev → Prod Workflow)
 
 1. Edit `semantic_views/tpch_revenue_analysis.yaml`
 2. Create a branch and open a PR
 3. The **Validate** workflow checks your YAML compiles correctly
-4. Merge — the **Deploy** workflow pushes to Snowflake, then runs evaluation
-5. If accuracy drops below 80%, the pipeline fails (revert the change)
+4. Merge — deploys to **SANDBOX_DEV.PUBLIC** (development)
+5. Iterate until satisfied with the dev version
+6. **Promote to production**: Create a [GitHub Release](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository) → deploys to **SANDBOX.PUBLIC** (production)
+
+### Promoting to Production
+
+```bash
+# Tag the current state and create a release
+gh release create v1.0.0 --title "Initial revenue analysis semantic view" --notes "First production release"
+```
+
+This triggers the deploy workflow targeting production (`SANDBOX.PUBLIC`) with the higher 80% eval threshold.
 
 ## Cortex Analyst Evaluation
 

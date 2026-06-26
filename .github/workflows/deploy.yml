@@ -2,12 +2,23 @@ name: Deploy Semantic Views
 
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - prod
   push:
     branches:
       - main
     paths:
       - "semantic_views/**"
       - "scripts/**"
+  release:
+    types: [published]
 
 permissions:
   id-token: write
@@ -16,10 +27,26 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      # Route to DEV on push/dispatch, PROD on release
+      TARGET_ENV: ${{ github.event_name == 'release' && 'prod' || (github.event.inputs.environment || 'dev') }}
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+
+      - name: Set target schema
+        id: target
+        run: |
+          if [ "$TARGET_ENV" = "prod" ]; then
+            echo "schema=SANDBOX.PUBLIC" >> "$GITHUB_OUTPUT"
+            echo "database=SANDBOX" >> "$GITHUB_OUTPUT"
+            echo "label=PRODUCTION" >> "$GITHUB_OUTPUT"
+          else
+            echo "schema=SANDBOX_DEV.PUBLIC" >> "$GITHUB_OUTPUT"
+            echo "database=SANDBOX_DEV" >> "$GITHUB_OUTPUT"
+            echo "label=DEVELOPMENT" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Install Snowflake CLI + OIDC Auth
         uses: snowflakedb/snowflake-actions@v3
@@ -28,22 +55,41 @@ jobs:
           cli-version: "3.16"
           default-config-file-path: config.toml
 
-      - name: Deploy Semantic Views to Snowflake
+      - name: "Deploy to ${{ steps.target.outputs.label }}"
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_WAREHOUSE: COMPUTE_G2_S
-          SNOWFLAKE_DATABASE: SANDBOX
+          SNOWFLAKE_DATABASE: ${{ steps.target.outputs.database }}
           SNOWFLAKE_SCHEMA: PUBLIC
-          SNOWFLAKE_TARGET_SCHEMA: "SANDBOX.PUBLIC"
-        run: ./scripts/deploy.sh
+          SNOWFLAKE_TARGET_SCHEMA: ${{ steps.target.outputs.schema }}
+        run: |
+          echo "╔══════════════════════════════════════════╗"
+          echo "║  Deploying to: ${{ steps.target.outputs.label }}"
+          echo "║  Schema: ${{ steps.target.outputs.schema }}"
+          echo "║  Trigger: ${{ github.event_name }}"
+          echo "╚══════════════════════════════════════════╝"
+          ./scripts/deploy.sh
 
   evaluate:
     needs: deploy
     runs-on: ubuntu-latest
+    env:
+      TARGET_ENV: ${{ github.event_name == 'release' && 'prod' || (github.event.inputs.environment || 'dev') }}
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+
+      - name: Set target schema
+        id: target
+        run: |
+          if [ "$TARGET_ENV" = "prod" ]; then
+            echo "schema=SANDBOX.PUBLIC" >> "$GITHUB_OUTPUT"
+            echo "database=SANDBOX" >> "$GITHUB_OUTPUT"
+          else
+            echo "schema=SANDBOX_DEV.PUBLIC" >> "$GITHUB_OUTPUT"
+            echo "database=SANDBOX_DEV" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Install Snowflake CLI + OIDC Auth
         uses: snowflakedb/snowflake-actions@v3
@@ -56,8 +102,8 @@ jobs:
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_WAREHOUSE: COMPUTE_G2_S
-          SNOWFLAKE_DATABASE: SANDBOX
+          SNOWFLAKE_DATABASE: ${{ steps.target.outputs.database }}
           SNOWFLAKE_SCHEMA: PUBLIC
-          SNOWFLAKE_TARGET_SCHEMA: "SANDBOX.PUBLIC"
-          EVAL_THRESHOLD: "80"
+          SNOWFLAKE_TARGET_SCHEMA: ${{ steps.target.outputs.schema }}
+          EVAL_THRESHOLD: ${{ env.TARGET_ENV == 'prod' && '80' || '70' }}
         run: ./scripts/evaluate.sh
