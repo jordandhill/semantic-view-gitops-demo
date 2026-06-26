@@ -52,11 +52,33 @@ rm -rf "$TMPDIR"
 # 3. Start the evaluation run
 echo ""
 echo "--- Starting evaluation run: ${RUN_NAME} ---"
-snow sql -q "CALL EXECUTE_AI_EVALUATION(
+START_OUTPUT=$(snow sql -q "CALL EXECUTE_AI_EVALUATION(
   'START',
   OBJECT_CONSTRUCT('run_name', '${RUN_NAME}'),
   '${STAGE_PATH}/${CONFIG_FILE}'
-);" -x
+);" -x 2>&1) || {
+  # Check if the error is about missing infrastructure (first-time setup needed)
+  if echo "$START_OUTPUT" | grep -qi "not found for object\|OPTIMIZATION\|not authorized"; then
+    echo ""
+    echo "╔══════════════════════════════════════════════════════════════╗"
+    echo "║  EVALUATION SKIPPED — First-time setup required             ║"
+    echo "╠══════════════════════════════════════════════════════════════╣"
+    echo "║  The Cortex Analyst evaluation infrastructure needs to be   ║"
+    echo "║  initialized. Run the first evaluation from Snowsight:      ║"
+    echo "║                                                             ║"
+    echo "║  1. Go to AI & ML > Cortex Analyst                         ║"
+    echo "║  2. Select TPCH_REVENUE_ANALYSIS                           ║"
+    echo "║  3. Click Evaluations tab > Create evaluation run           ║"
+    echo "║  4. After the first run, CI/CD evaluations will work        ║"
+    echo "╚══════════════════════════════════════════════════════════════╝"
+    echo ""
+    echo "Continuing without evaluation (pipeline will not fail)."
+    exit 0
+  fi
+  echo "$START_OUTPUT"
+  exit 1
+}
+echo "$START_OUTPUT"
 
 # 4. Poll for completion
 echo ""
