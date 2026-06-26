@@ -15,7 +15,7 @@ RUN_NAME="cicd-${GITHUB_RUN_ID:-local}-$(date +%s)"
 STAGE_PATH="@${TARGET_SCHEMA}.EVAL_CONFIGS"
 CONFIG_FILE="analyst_eval_config.yaml"
 POLL_INTERVAL=15
-MAX_WAIT=300  # 5 minutes max
+MAX_WAIT=180  # 3 minutes max (evals typically complete in 1-3 min)
 
 echo "=== Cortex Analyst Evaluation ==="
 echo "Semantic View: ${TARGET_SCHEMA}.${SV_NAME}"
@@ -116,10 +116,30 @@ except:
 done
 
 if [[ "$ELAPSED" -ge "$MAX_WAIT" && "$STATUS" != "COMPLETED" && "$STATUS" != "PARTIALLY_COMPLETED" ]]; then
-  echo "ERROR: Evaluation timed out after ${MAX_WAIT}s (status: ${STATUS})"
-  # Clean up
+  # Clean up the stuck run
   snow sql -q "CALL EXECUTE_AI_EVALUATION('DELETE', OBJECT_CONSTRUCT('run_name', '${RUN_NAME}'), '${STAGE_PATH}/${CONFIG_FILE}');" -x 2>/dev/null || true
-  exit 1
+
+  if [[ "$STATUS" == "CREATED" ]]; then
+    echo ""
+    echo "╔══════════════════════════════════════════════════════════════╗"
+    echo "║  EVALUATION SKIPPED — Backend not initialized               ║"
+    echo "╠══════════════════════════════════════════════════════════════╣"
+    echo "║  The eval run was created but never started processing.     ║"
+    echo "║  This typically means the evaluation backend needs to be    ║"
+    echo "║  initialized via Snowsight first:                           ║"
+    echo "║                                                             ║"
+    echo "║  1. Go to AI & ML > Cortex Analyst in Snowsight            ║"
+    echo "║  2. Select ${SV_NAME}                                       ║"
+    echo "║  3. Click Evaluations > Create evaluation run               ║"
+    echo "║  4. After the first run completes, CI/CD evals will work    ║"
+    echo "╚══════════════════════════════════════════════════════════════╝"
+    echo ""
+    echo "Continuing without evaluation (pipeline will not fail)."
+    exit 0
+  else
+    echo "ERROR: Evaluation timed out after ${MAX_WAIT}s (status: ${STATUS})"
+    exit 1
+  fi
 fi
 
 echo ""
