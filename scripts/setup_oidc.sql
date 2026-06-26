@@ -6,12 +6,14 @@
 USE ROLE ACCOUNTADMIN;
 
 -- 1. Create a service user that trusts GitHub's OIDC provider
+--    Uses customized subject claim (repo-level): just the repository name
+--    This allows all triggers (push, release, PR, dispatch) to authenticate
 CREATE OR REPLACE USER GITHUB_ACTIONS_SVC
   TYPE = SERVICE
   WORKLOAD_IDENTITY = (
     TYPE = OIDC
     ISSUER = 'https://token.actions.githubusercontent.com'
-    SUBJECT = 'repo:jordandhill/semantic-view-gitops-demo:ref:refs/heads/main'
+    SUBJECT = 'repo:jordandhill/semantic-view-gitops-demo'
   );
 
 -- 2. Create a role for CI/CD operations
