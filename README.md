@@ -42,7 +42,7 @@ Version-control Snowflake **Semantic Views** with Git and deploy them automatica
 │   └── setup_oidc.sql                ← One-time Snowflake OIDC setup
 ├── .github/workflows/
 │   ├── validate.yml                  ← Runs on PRs (dry-run validation)
-│   └── deploy.yml                    ← Runs on push to main (deploy + evaluate)
+│   └── deploy.yml                    ← Push→DEV, Release→PROD (deploy + evaluate)
 ├── config.toml                       ← Snowflake CLI connection config
 └── README.md
 ```
@@ -57,7 +57,10 @@ Version-control Snowflake **Semantic Views** with Git and deploy them automatica
 
 ### 1. Configure OIDC Trust in Snowflake
 
-Run `scripts/setup_oidc.sql` as ACCOUNTADMIN. This creates a service user that trusts GitHub's OIDC provider:
+Run `scripts/setup_oidc.sql` as ACCOUNTADMIN. This creates:
+- A service user with OIDC trust for GitHub
+- A `CICD_SEMANTIC_VIEWS` role with deploy + eval privileges
+- Two target databases: `SANDBOX_DEV` (dev) and `SANDBOX` (prod)
 
 ```sql
 CREATE OR REPLACE USER GITHUB_ACTIONS_SVC
@@ -65,11 +68,20 @@ CREATE OR REPLACE USER GITHUB_ACTIONS_SVC
   WORKLOAD_IDENTITY = (
     TYPE = OIDC
     ISSUER = 'https://token.actions.githubusercontent.com'
-    SUBJECT = 'repo:<owner>/semantic-view-gitops-demo:ref:refs/heads/main'
+    SUBJECT = 'repo:<owner>/semantic-view-gitops-demo'
   );
 ```
 
-> See [Workload Identity Federation — OIDC subject formats](https://docs.snowflake.com/en/developer-guide/snowflake-cli/cicd/github-action#create-the-service-user) for subject claim variants (PR events, environments, etc.)
+**Important**: To use a simplified subject (without ref path), customize the OIDC subject claim at the repo level:
+
+```bash
+gh api repos/<owner>/semantic-view-gitops-demo/actions/oidc/customization/sub \
+  --method PUT --input - <<< '{"use_default": false, "include_claim_keys": ["repository"]}'
+```
+
+This produces a stable subject (`repo:<owner>/<repo>`) that works for all trigger types (push, release, PR, dispatch) without needing separate service users.
+
+> See [Workload Identity Federation docs](https://docs.snowflake.com/en/user-guide/workload-identity-federation) and [GitHub OIDC subject customization](https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/about-security-hardening-with-openid-connect#customizing-the-subject-claims-for-an-organization-or-repository) for details.
 
 ### 2. Set GitHub Secret
 
